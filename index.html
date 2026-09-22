@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Firebase WebRTC Video Calling App</title>
+
+  <!-- Firebase SDKs (Compat version for browser direct run) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+  <!-- Google Font & Icons -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: #0f172a;
+      color: #f8fafc;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    /* Video Container */
+    .call-container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      background: #090d16;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #remoteVideo {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      background: #111827;
+    }
+
+    #localVideo {
+      position: absolute;
+      top: 24px;
+      right: 24px;
+      width: 140px;
+      height: 190px;
+      object-fit: cover;
+      border-radius: 16px;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+      background: #1f2937;
+      z-index: 10;
+      transform: scaleX(-1); /* Mirror view for selfie camera */
+    }
+
+    /* Top Bar Status */
+    .top-bar {
+      position: absolute;
+      top: 24px;
+      left: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      z-index: 10;
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(10px);
+      padding: 10px 18px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .call-status {
+      font-size: 14px;
+      font-weight: 600;
+      color: #38bdf8;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .call-timer {
+      font-size: 13px;
+      color: #94a3b8;
+      font-weight: 500;
+    }
+
+    /* Initial Setup Screen (Dialer / Join Card) */
+    .setup-modal {
+      position: absolute;
+      z-index: 50;
+      background: rgba(30, 41, 59, 0.95);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      padding: 30px;
+      width: 90%;
+      max-width: 400px;
+      text-align: center;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+    }
+
+    .setup-modal h2 {
+      margin-bottom: 8px;
+      font-size: 22px;
+      color: #fff;
+    }
+
+    .setup-modal p {
+      font-size: 13px;
+      color: #94a3b8;
+      margin-bottom: 20px;
+    }
+
+    .input-group {
+      margin-bottom: 16px;
+      text-align: left;
+    }
+
+    .input-group label {
+      display: block;
+      font-size: 12px;
+      color: #cbd5e1;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .input-group input {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      color: white;
+      font-size: 14px;
+      outline: none;
+    }
+
+    .input-group input:focus {
+      border-color: #38bdf8;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 15px;
+    }
+
+    .action-btn {
+      flex: 1;
+      padding: 12px;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+    }
+
+    .btn-create {
+      background: #2563eb;
+      color: white;
+    }
+
+    .btn-create:hover {
+      background: #1d4ed8;
+    }
+
+    .btn-join {
+      background: #10b981;
+      color: white;
+    }
+
+    .btn-join:hover {
+      background: #059669;
+    }
+
+    /* Incoming Call Ringing Dialog */
+    .incoming-dialog {
+      position: absolute;
+      z-index: 60;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(17, 24, 39, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 24px;
+      padding: 30px;
+      width: 320px;
+      text-align: center;
+      display: none;
+      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.8);
+      animation: pulseModal 2s infinite ease-in-out;
+    }
+
+    @keyframes pulseModal {
+      0%, 100% { box-shadow: 0 0 20px rgba(56, 189, 248, 0.2); }
+      50% { box-shadow: 0 0 35px rgba(56, 189, 248, 0.5); }
+    }
+
+    .caller-avatar {
+      width: 80px;
+      height: 80px;
+      background: #334155;
+      border-radius: 50%;
+      margin: 0 auto 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      color: #38bdf8;
+    }
+
+    .incoming-dialog h3 {
+      font-size: 18px;
+      margin-bottom: 6px;
+    }
+
+    .incoming-dialog p {
+      font-size: 13px;
+      color: #94a3b8;
+      margin-bottom: 24px;
+    }
+
+    .call-actions-row {
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+    }
+
+    /* Bottom Control Bar */
+    .control-bar {
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(12px);
+      padding: 12px 24px;
+      border-radius: 50px;
+      display: flex;
+      gap: 18px;
+      align-items: center;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      z-index: 20;
+    }
+
+    .circle-btn {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 18px;
+      color: white;
+      border: none;
+      cursor: pointer;
+      background: #334155;
+      transition: all 0.2s ease;
+    }
+
+    .circle-btn:hover {
+      transform: scale(1.08);
+      background: #475569;
+    }
+
+    .circle-btn.active-off {
+      background: #e11d48;
+      color: white;
+    }
+
+    .btn-answer {
+      background: #10b981;
+    }
+
+    .btn-answer:hover {
+      background: #059669;
+    }
+
+    .btn-end {
+      background: #ef4444;
+    }
+
+    .btn-end:hover {
+      background: #dc2626;
+    }
+
+    /* Mobile Adaptations */
+    @media (max-width: 600px) {
+      #localVideo {
+        width: 105px;
+        height: 150px;
+        top: 16px;
+        right: 16px;
+      }
+      .control-bar {
+        bottom: 20px;
+        gap: 12px;
+        padding: 10px 18px;
+      }
+      .circle-btn {
+        width: 46px;
+        height: 46px;
+        font-size: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="call-container">
+    <!-- Top Bar Info -->
+    <div class="top-bar">
+      <div class="call-status" id="callStatusText">
+        <i class="fa-solid fa-circle-dot" style="color: #ef4444;"></i> तैयार (Offline)
+      </div>
+      <div class="call-timer" id="callTimer">00:00</div>
+    </div>
+
+    <!-- Video Streams -->
+    <video id="remoteVideo" autoplay playsinline></video>
+    <video id="localVideo" autoplay playsinline muted></video>
+
+    <!-- Initial Setup Modal (Call ID generator & joiner) -->
+    <div class="setup-modal" id="setupModal">
+      <h2><i class="fa-solid fa-video" style="color: #38bdf8;"></i> Video Call App</h2>
+      <p>नया कॉल शुरू करें या कॉल ID डालकर कनेक्ट हों</p>
+
+      <div class="input-group">
+        <label>Call / Room ID</label>
+        <input type="text" id="callInput" placeholder="Room ID यहाँ पेस्ट करें...">
+      </div>
+
+      <div class="btn-row">
+        <button class="action-btn btn-create" id="btnCreateCall">
+          <i class="fa-solid fa-plus"></i> Call ID बनाएँ
+        </button>
+        <button class="action-btn btn-join" id="btnJoinCall">
+          <i class="fa-solid fa-phone"></i> Call से जुड़ें
+        </button>
+      </div>
+    </div>
+
+    <!-- Incoming Call Overlay (Answer / Reject) -->
+    <div class="incoming-dialog" id="incomingDialog">
+      <div class="caller-avatar">
+        <i class="fa-solid fa-user"></i>
+      </div>
+      <h3 id="incomingCallerName">इनकमिंग वीडियो कॉल...</h3>
+      <p>कोई आपसे जुड़ना चाहता है</p>
+
+      <div class="call-actions-row">
+        <button class="circle-btn btn-answer" id="btnAnswerIncoming" title="Answer Call">
+          <i class="fa-solid fa-phone"></i>
+        </button>
+        <button class="circle-btn btn-end" id="btnRejectIncoming" title="Reject Call">
+          <i class="fa-solid fa-phone-slash"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Bottom Controls (Mute, Video, Speaker, End) -->
+    <div class="control-bar" id="controlsBar">
+      <button class="circle-btn" id="btnMute" title="Mute/Unmute Mic">
+        <i class="fa-solid fa-microphone"></i>
+      </button>
+
+      <button class="circle-btn" id="btnVideo" title="Camera On/Off">
+        <i class="fa-solid fa-video"></i>
+      </button>
+
+      <button class="circle-btn" id="btnSpeaker" title="Speaker On/Off">
+        <i class="fa-solid fa-volume-high"></i>
+      </button>
+
+      <button class="circle-btn btn-end" id="btnHangUp" title="End Call">
+        <i class="fa-solid fa-phone-slash"></i>
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // ==========================================
+    // 1. FIREBASE CONFIGURATION
+    // यहाँ अपनी Firebase Project Details पेस्ट करें:
+    // ==========================================
+    const firebaseConfig = {
+      apiKey: "AIzaSyYOUR_API_KEY_HERE",
+      authDomain: "your-project-id.firebaseapp.com",
+      projectId: "your-project-id",
+      storageBucket: "your-project-id.appspot.com",
+      messagingSenderId: "1234567890",
+      appId: "1:1234567890:web:abcdef123456"
+    };
+
+    // Firebase Initialize
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+    const firestore = firebase.firestore();
+
+    // ==========================================
+    // 2. WebRTC STUN SERVERS & VARIABLES
+    // ==========================================
+    const servers = {
+      iceServers: [
+        {
+          urls: [
+            'stun:stun1.l.google.com:19302',
+            'stun:stun2.l.google.com:19302'
+          ]
+        }
+      ],
+      iceCandidatePoolSize: 10
+    };
+
+    let pc = null;
+    let localStream = null;
+    let remoteStream = null;
+    let currentCallDocRef = null;
+    let timerInterval = null;
+    let secondsElapsed = 0;
+
+    // UI Elements
+    const localVideo = document.getElementById('localVideo');
+    const remoteVideo = document.getElementById('remoteVideo');
+    const setupModal = document.getElementById('setupModal');
+    const callInput = document.getElementById('callInput');
+    const callStatusText = document.getElementById('callStatusText');
+    const callTimer = document.getElementById('callTimer');
+    const incomingDialog = document.getElementById('incomingDialog');
+
+    const btnCreateCall = document.getElementById('btnCreateCall');
+    const btnJoinCall = document.getElementById('btnJoinCall');
+    const btnAnswerIncoming = document.getElementById('btnAnswerIncoming');
+    const btnRejectIncoming = document.getElementById('btnRejectIncoming');
+
+    const btnMute = document.getElementById('btnMute');
+    const btnVideo = document.getElementById('btnVideo');
+    const btnSpeaker = document.getElementById('btnSpeaker');
+    const btnHangUp = document.getElementById('btnHangUp');
+
+    // ==========================================
+    // 3. CAMERA & MICROPHONE INITIALIZATION
+    // ==========================================
+    async function startMedia() {
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: true
+        });
+        localVideo.srcObject = localStream;
+
+        remoteStream = new MediaStream();
+        remoteVideo.srcObject = remoteStream;
+      } catch (err) {
+        alert("कैमरा या माइक्रोफ़ोन की अनुमति नहीं मिली: " + err.message);
+      }
+    }
+
+    // ==========================================
+    // 4. CREATE A NEW CALL (OFFER)
+    // ==========================================
+    btnCreateCall.onclick = async () => {
+      await startMedia();
+      setupModal.style.display = 'none';
+      updateStatus("कॉलिंग...", "#f59e0b");
+
+      pc = new RTCPeerConnection(servers);
+
+      // Local Tracks add करें
+      localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+
+      // Remote Tracks receive करें
+      pc.ontrack = (event) => {
+        event.streams[0].getTracks().forEach(track => remoteStream.addTrack(track));
+      };
+
+      // Firestore में कॉल डॉक्यूमेंट बनाएँ
+      const callDoc = firestore.collection('calls').doc();
+      currentCallDocRef = callDoc;
+      const offerCandidates = callDoc.collection('offerCandidates');
+      const answerCandidates = callDoc.collection('answerCandidates');
+
+      callInput.value = callDoc.id;
+
+      // ICE Candidates भेजें
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          offerCandidates.add(event.candidate.toJSON());
+        }
+      };
+
+      // Offer SDP बनाएँ
+      const offerDescription = await pc.createOffer();
+      await pc.setLocalDescription(offerDescription);
+
+      const offer = {
+        sdp: offerDescription.sdp,
+        type: offerDescription.type
+      };
+
+      await callDoc.set({ offer, status: 'calling' });
+
+      // Prompt to share Call ID
+      navigator.clipboard.writeText(callDoc.id).catch(() => {});
+      alert(`कॉल ID तैयार है!\n\nRoom ID: ${callDoc.id}\n(यह ID कॉपी हो गई है, इसे दूसरे व्यक्ति को भेजें)`);
+
+      // Answer का इंतज़ार करें
+      callDoc.onSnapshot((snapshot) => {
+        const data = snapshot.data();
+        if (!data) return;
+
+        if (data.status === 'ended') {
+          hangUp();
+        }
+
+        if (!pc.currentRemoteDescription && data.answer) {
+          const answerDesc = new RTCSessionDescription(data.answer);
+          pc.setRemoteDescription(answerDesc);
+          updateStatus("कॉल कनेक्टेड", "#10b981");
+          startTimer();
+        }
+      });
+
+      // Callee के ICE Candidates सुनें
+      answerCandidates.onSnapshot((snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === 'added') {
+            const candidate = new RTCIceCandidate(change.doc.data());
+            pc.addIceCandidate(candidate);
+          }
+        });
+      });
+    };
+
+    // ==========================================
+    // 5. JOIN / ANSWER CALL
+    // ==========================================
+    btnJoinCall.onclick = async () => {
+      const callId = callInput.value.trim();
+      if (!callId) {
+        alert("कृपया पहले Call ID दर्ज करें!");
+        return;
+      }
+
+      setupModal.style.display = 'none';
+      incomingDialog.style.display = 'block';
+      currentCallDocRef = firestore.collection('calls').doc(callId);
+    };
+
+    // Answer incoming call
+    btnAnswerIncoming.onclick = async () => {
+      incomingDialog.style.display = 'none';
+      await startMedia();
+
+      pc = new RTCPeerConnection(servers);
+
+      localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+
+      pc.ontrack = (event) => {
+        event.streams[0].getTracks().forEach(track => remoteStream.addTrack(track));
+      };
+
+      const callDoc = currentCallDocRef;
+      const answerCandidates = callDoc.collection('answerCandidates');
+      const offerCandidates = callDoc.collection('offerCandidates');
+
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          answerCandidates.add(event.candidate.toJSON());
+        }
+      };
+
+      const callData = (await callDoc.get()).data();
+      if (!callData || !callData.offer) {
+        alert("कॉल मौजूद नहीं है या समाप्त हो गई है!");
+        resetUI();
+        return;
+      }
+
+      const offerDescription = callData.offer;
+      await pc.setRemoteDescription(new RTCSessionDescription(offerDescription));
+
+      const answerDescription = await pc.createAnswer();
+      await pc.setLocalDescription(answerDescription);
+
+      const answer = {
+        type: answerDescription.type,
+        sdp: answerDescription.sdp
+      };
+
+      await callDoc.update({ answer, status: 'connected' });
+      updateStatus("कॉल कनेक्टेड", "#10b981");
+      startTimer();
+
+      // Listen for caller candidates
+      offerCandidates.onSnapshot((snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === 'added') {
+            const data = change.doc.data();
+            pc.addIceCandidate(new RTCIceCandidate(data));
+          }
+        });
+      });
+
+      // Listen for call termination
+      callDoc.onSnapshot((snapshot) => {
+        const data = snapshot.data();
+        if (data && data.status === 'ended') {
+          hangUp();
+        }
+      });
+    };
+
+    // Reject incoming call
+    btnRejectIncoming.onclick = async () => {
+      if (currentCallDocRef) {
+        await currentCallDocRef.update({ status: 'ended' });
+      }
+      incomingDialog.style.display = 'none';
+      resetUI();
+    };
+
+    // ==========================================
+    // 6. CONTROLS: MUTE, VIDEO, SPEAKER, HANG UP
+    // ==========================================
+
+    // Mute / Unmute
+    let isMuted = false;
+    btnMute.onclick = () => {
+      if (!localStream) return;
+      isMuted = !isMuted;
+      localStream.getAudioTracks().forEach(track => {
+        track.enabled = !isMuted;
+      });
+      btnMute.classList.toggle('active-off', isMuted);
+      btnMute.innerHTML = isMuted 
+        ? '<i class="fa-solid fa-microphone-slash"></i>' 
+        : '<i class="fa-solid fa-microphone"></i>';
+    };
+
+    // Video On / Off
+    let isVideoOff = false;
+    btnVideo.onclick = () => {
+      if (!localStream) return;
+      isVideoOff = !isVideoOff;
+      localStream.getVideoTracks().forEach(track => {
+        track.enabled = !isVideoOff;
+      });
+      btnVideo.classList.toggle('active-off', isVideoOff);
+      btnVideo.innerHTML = isVideoOff 
+        ? '<i class="fa-solid fa-video-slash"></i>' 
+        : '<i class="fa-solid fa-video"></i>';
+    };
+
+    // Speaker Mute / Unmute
+    let isSpeakerMuted = false;
+    btnSpeaker.onclick = () => {
+      isSpeakerMuted = !isSpeakerMuted;
+      remoteVideo.muted = isSpeakerMuted;
+      btnSpeaker.classList.toggle('active-off', isSpeakerMuted);
+      btnSpeaker.innerHTML = isSpeakerMuted 
+        ? '<i class="fa-solid fa-volume-xmark"></i>' 
+        : '<i class="fa-solid fa-volume-high"></i>';
+    };
+
+    // Hang Up / End Call
+    btnHangUp.onclick = async () => {
+      if (currentCallDocRef) {
+        try {
+          await currentCallDocRef.update({ status: 'ended' });
+        } catch (e) {}
+      }
+      hangUp();
+    };
+
+    function hangUp() {
+      if (pc) {
+        pc.close();
+        pc = null;
+      }
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        localStream = null;
+      }
+      remoteVideo.srcObject = null;
+      localVideo.srcObject = null;
+
+      stopTimer();
+      updateStatus("कॉल समाप्त", "#ef4444");
+
+      setTimeout(() => {
+        resetUI();
+      }, 1200);
+    }
+
+    function resetUI() {
+      setupModal.style.display = 'block';
+      incomingDialog.style.display = 'none';
+      callInput.value = '';
+      callTimer.innerText = '00:00';
+      updateStatus("तैयार (Offline)", "#ef4444");
+    }
+
+    // Helpers
+    function updateStatus(text, color) {
+      callStatusText.innerHTML = `<i class="fa-solid fa-circle-dot" style="color: ${color};"></i> ${text}`;
+    }
+
+    function startTimer() {
+      stopTimer();
+      secondsElapsed = 0;
+      timerInterval = setInterval(() => {
+        secondsElapsed++;
+        const mins = String(Math.floor(secondsElapsed / 60)).padStart(2, '0');
+        const secs = String(secondsElapsed % 60).padStart(2, '0');
+        callTimer.innerText = `${mins}:${secs}`;
+      }, 1000);
+    }
+
+    function stopTimer() {
+      if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+      }
+    }
+  </script>
+</body>
+</html>
