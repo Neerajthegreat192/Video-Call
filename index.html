@@ -1,0 +1,1163 @@
+﻿<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#000000">
+<title>वीडियो कॉल एवं चैट</title>
+<style>
+:root{
+  --bg:#070503; --card:rgba(32,18,9,0.75); --line:rgba(245,197,66,0.22);
+  --accent:#f5c542; --danger:#ef4444; --success:#10b981; --text:#fbf7f0;
+  --bubble-me:#24452a; --bubble-them:#1d1814;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
+html,body{height:100%;width:100%;overflow:hidden;background:#000;color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;user-select:none}
+.screen{position:fixed;inset:0;height:100vh;height:100dvh;display:flex;flex-direction:column}
+[hidden]{display:none !important}
+button{font-family:inherit;cursor:pointer}
+
+/* ============ मुख्य स्क्रीन (LOBBY) ============ */
+#lobby{
+  background:radial-gradient(circle at 50% 10%, #2b1506 0%, #0d0602 60%, #000 100%);
+  overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding:calc(16px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));
+  align-items:center;
+}
+.header{width:100%;max-width:460px;display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.logo{font-size:18px;font-weight:900;letter-spacing:1px;background:linear-gradient(180deg,#fff2c0,#f5c542);-webkit-background-clip:text;background-clip:text;color:transparent}
+.user-badge{
+  font-size:12px;color:var(--accent);background:rgba(245,197,66,.1);
+  padding:6px 14px;border-radius:30px;border:1px solid var(--line);
+  display:flex;align-items:center;gap:6px;font-weight:700;cursor:pointer;
+}
+
+/* अनुमति स्थिति कार्ड */
+.perm-card{
+  width:100%;max-width:460px;background:var(--card);backdrop-filter:blur(14px);
+  border:1px solid var(--line);border-radius:20px;padding:16px;margin-bottom:16px;
+  box-shadow:0 8px 24px rgba(0,0,0,.5);
+}
+.perm-title{font-size:13px;font-weight:800;color:#fff2c0;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.perm-status-row{display:flex;gap:12px;margin-bottom:12px}
+.perm-badge{
+  flex:1;background:rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.08);
+  padding:8px 10px;border-radius:12px;font-size:11px;font-weight:700;display:flex;align-items:center;gap:6px;
+}
+.btn-perm{
+  width:100%;background:linear-gradient(180deg,#f7d67a,#e3b64c 50%,#a8760f);
+  color:#201004;border:0;padding:10px;border-radius:12px;font-size:12px;font-weight:900;text-transform:uppercase;
+}
+.perm-help{font-size:11px;color:#a89782;margin-top:10px;line-height:1.4;background:rgba(0,0,0,.3);padding:8px;border-radius:8px}
+
+/* संपर्क सूची एवं लाल रंग का अनरीड बैज */
+.contacts-wrap{width:100%;max-width:460px;display:flex;flex-direction:column;gap:10px}
+.section-title{font-size:11px;letter-spacing:1px;color:#8a7967;text-transform:uppercase;font-weight:800;margin-bottom:2px}
+.contact-card{
+  background:var(--card);backdrop-filter:blur(12px);
+  border:1px solid var(--line);border-radius:16px;
+  padding:12px 14px;display:flex;align-items:center;justify-content:space-between;
+  box-shadow:0 4px 14px rgba(0,0,0,.4);cursor:pointer;
+}
+.contact-info{display:flex;align-items:center;gap:12px}
+.contact-avatar{
+  width:42px;height:42px;border-radius:50%;background:#2e1808;
+  border:1px solid rgba(245,197,66,.3);display:flex;align-items:center;justify-content:center;
+  font-size:17px;color:var(--accent);font-weight:800;
+}
+.contact-name-row{display:flex;align-items:center;gap:6px}
+.contact-name{font-size:15px;font-weight:700;color:#fff}
+.badge-unread{
+  background:#ef4444;color:#ffffff;font-size:11px;font-weight:800;
+  padding:2px 7px;border-radius:12px;box-shadow:0 0 8px rgba(239,68,68,0.7);
+}
+.contact-status{font-size:11px;color:#8a7967;display:flex;align-items:center;gap:5px;margin-top:2px}
+.dot{width:7px;height:7px;border-radius:50%;background:#555}
+.dot.online{background:var(--success);box-shadow:0 0 6px var(--success)}
+.contact-actions{display:flex;align-items:center;gap:8px}
+.icon-btn{
+  background:rgba(255,255,255,.08);border:1px solid rgba(245,197,66,.2);
+  width:36px;height:36px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:15px;
+}
+.call-btn{
+  background:linear-gradient(135deg,#10b981,#059669);
+  border:0;color:#fff;padding:8px 14px;border-radius:24px;
+  font-size:12px;font-weight:800;display:flex;align-items:center;gap:4px;
+}
+
+/* ============ चैट स्क्रीन (व्हाट्सएप स्टाइल) ============ */
+#chatScreen{background:#0d0804;z-index:40}
+.chat-header{
+  padding:calc(12px + env(safe-area-inset-top)) 16px 12px;
+  background:rgba(25,14,7,0.95);backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;
+}
+.chat-header-user{display:flex;align-items:center;gap:10px}
+.chat-back-btn{background:none;border:0;color:var(--accent);font-size:24px;padding:4px 8px 4px 0}
+.chat-user-title{font-size:15px;font-weight:800;color:#fff}
+.chat-user-sub{font-size:11px;color:#8a7967}
+.chat-body{
+  flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px;display:flex;flex-direction:column;gap:10px;
+}
+.chat-bubble{
+  max-width:78%;padding:9px 13px;border-radius:16px;font-size:14px;line-height:1.4;
+  word-break:break-word;position:relative;
+}
+.chat-bubble.me{
+  align-self:flex-end;background:var(--bubble-me);border-bottom-right-radius:4px;
+  border:1px solid rgba(46,204,113,.25);color:#f0fdf4;
+}
+.chat-bubble.them{
+  align-self:flex-start;background:var(--bubble-them);border-bottom-left-radius:4px;
+  border:1px solid var(--line);color:#fef3c7;
+}
+.chat-time{font-size:9px;color:rgba(255,255,255,.5);margin-top:4px;text-align:right}
+.chat-footer{
+  padding:10px 14px calc(14px + env(safe-area-inset-bottom));
+  background:rgba(20,10,5,0.95);border-top:1px solid var(--line);display:flex;gap:10px;align-items:center;
+}
+.chat-input{
+  flex:1;background:rgba(0,0,0,.6);border:1px solid var(--line);border-radius:24px;
+  padding:10px 16px;color:#fff;font-size:14px;outline:none;
+}
+.send-btn{
+  width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,#10b981,#059669);
+  border:0;color:#fff;font-size:16px;display:grid;place-items:center;
+}
+
+/* ============ वीडियो कॉल स्क्रीन ============ */
+#call{background:#000;overflow:hidden;touch-action:manipulation}
+
+/* रिमोट वीडियो ग्रिड: 2 लोगों में 100% फुल स्क्रीन, 3+ लोगों में बराबर स्प्लिट */
+#remoteGrid{
+  position:absolute;inset:0;width:100%;height:100%;display:grid;background:#000;z-index:1;
+}
+#remoteGrid.count-1{grid-template-columns:1fr;grid-template-rows:1fr}
+#remoteGrid.count-2{grid-template-columns:1fr;grid-template-rows:1fr 1fr;gap:4px}
+#remoteGrid.count-3,#remoteGrid.count-4{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:4px}
+
+.remote-cell{
+  position:relative;width:100%;height:100%;background:#090502;overflow:hidden;
+}
+.remote-cell video{width:100%;height:100%;object-fit:cover}
+.cell-badge{
+  position:absolute;bottom:10px;left:10px;background:rgba(0,0,0,.6);backdrop-filter:blur(6px);
+  padding:4px 10px;border-radius:12px;font-size:11px;font-weight:700;color:var(--accent);
+}
+
+/* अपनी वीडियो: हमेशा कोने में छोटी विंडो (PiP) */
+.pip-wrap{
+  position:absolute;top:calc(16px + env(safe-area-inset-top));right:16px;
+  width:100px;aspect-ratio:3/4;border-radius:18px;overflow:hidden;
+  border:2px solid rgba(245,197,66,.45);box-shadow:0 10px 30px rgba(0,0,0,.9);
+  background:#140a03;z-index:10;touch-action:none;transition:transform .25s ease, opacity .25s ease;
+}
+.pip-wrap.hidden{transform:translateX(130px);opacity:0;pointer-events:none}
+.pip-wrap video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1);pointer-events:none}
+.pip-hide{
+  position:absolute;top:4px;left:4px;width:24px;height:24px;border-radius:50%;
+  border:1px solid rgba(245,197,66,.35);background:rgba(0,0,0,.7);color:#f5c542;
+  font-size:14px;font-weight:900;display:grid;place-items:center;
+}
+.pip-show{
+  position:absolute;top:calc(16px + env(safe-area-inset-top));right:0;z-index:11;
+  background:rgba(25,12,4,.85);border:1px solid rgba(245,197,66,.4);border-right:0;
+  border-radius:12px 0 0 12px;padding:9px 11px;color:#f5c542;font-size:16px;line-height:1;
+  backdrop-filter:blur(8px);transition:opacity .35s, transform .35s;
+}
+
+/* टाइमर व कंट्रोल्स */
+.top-pill{
+  position:absolute;top:calc(16px + env(safe-area-inset-top));left:16px;
+  z-index:12;transition:opacity .35s, transform .35s;
+}
+.timer-pill{
+  background:rgba(0,0,0,.55);backdrop-filter:blur(10px);padding:5px 12px;
+  border-radius:20px;border:1px solid rgba(255,255,255,.1);color:var(--accent);
+  font-family:monospace;font-size:13px;font-weight:800;
+}
+.controls{
+  position:absolute;bottom:calc(20px + env(safe-area-inset-bottom));left:0;right:0;
+  display:flex;align-items:center;justify-content:center;gap:12px;z-index:15;padding:0 8px;
+  transition:opacity .35s, transform .35s;
+}
+.ctl{
+  width:50px;height:50px;border-radius:50%;border:1px solid rgba(255,255,255,.15);
+  display:flex;align-items:center;justify-content:center;color:#fff;
+  background:rgba(25,25,25,0.7);backdrop-filter:blur(16px);transition:all .15s;
+}
+.ctl:active{transform:scale(.9)}
+.ctl.off{background:rgba(239,68,68,0.3);border-color:var(--danger);color:#ff9e9e}
+.ctl.hang{background:var(--danger);border-color:#ff8585}
+.ctl.add{background:rgba(245,197,66,0.25);border-color:var(--accent);color:var(--accent)}
+.ctl-ic{font-size:18px;line-height:1}
+
+.fade-out{opacity:0 !important;pointer-events:none !important;transform:translateY(15px)}
+.fade-out-right{opacity:0 !important;pointer-events:none !important;transform:translateX(20px)}
+
+/* डायलॉग बॉक्स */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(10px);
+  display:flex;align-items:center;justify-content:center;z-index:99;padding:20px;
+}
+.modal-box{
+  background:linear-gradient(160deg,#241206,#0d0602);
+  border:1px solid var(--line);border-radius:24px;
+  padding:24px 20px;width:100%;max-width:340px;text-align:center;
+  box-shadow:0 20px 40px rgba(0,0,0,.85);
+}
+.modal-box h2{font-size:18px;margin-bottom:8px;color:#fff2c0}
+.modal-box p{font-size:12px;color:#8a7967;margin-bottom:16px}
+.modal-input{
+  width:100%;padding:12px 14px;border-radius:14px;border:1px solid var(--line);
+  background:rgba(0,0,0,.6);color:#fff;font-size:15px;outline:none;text-align:center;font-weight:600;margin-bottom:14px;
+}
+.btn-gold{
+  width:100%;background:linear-gradient(180deg,#f7d67a,#e3b64c 50%,#a8760f);
+  color:#201004;border:0;padding:12px;border-radius:14px;font-size:13px;font-weight:900;text-transform:uppercase;
+}
+.btn-danger-outline{
+  width:100%;background:transparent;border:1px solid rgba(239,68,68,.4);
+  color:#ff9e9e;padding:10px;border-radius:14px;font-size:12px;font-weight:700;margin-top:8px;
+}
+
+.call-dialog{
+  position:fixed;inset:0;background:rgba(0,0,0,.92);backdrop-filter:blur(16px);
+  display:flex;flex-direction:column;align-items:center;justify-content:space-around;
+  z-index:95;padding:calc(40px + env(safe-area-inset-top)) 20px calc(40px + env(safe-area-inset-bottom));
+}
+.caller-photo{
+  width:96px;height:96px;border-radius:50%;background:#1d0e04;
+  border:2px solid var(--accent);display:flex;align-items:center;justify-content:center;
+  font-size:40px;box-shadow:0 0 35px rgba(245,197,66,.3);animation:pulse 2s infinite;
+}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+.caller-title{font-size:20px;font-weight:800;color:#fff;margin-top:16px}
+.caller-subtitle{font-size:13px;color:#8a7967;margin-top:4px}
+.dialog-actions{display:flex;gap:45px;align-items:center}
+.circle-btn{
+  width:64px;height:64px;border-radius:50%;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;border:0;color:#fff;font-weight:800;gap:2px;font-size:10px;
+}
+.btn-accept{background:#10b981;box-shadow:0 8px 24px rgba(16,185,129,.5)}
+.btn-reject{background:#ef4444;box-shadow:0 8px 24px rgba(239,68,68,.5)}
+
+#toast{
+  position:fixed;top:calc(14px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);
+  background:#1a0c03;border:1px solid var(--accent);color:#fff;padding:8px 16px;
+  border-radius:12px;font-size:12px;font-weight:700;z-index:100;opacity:0;pointer-events:none;transition:.2s;
+}
+#toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<!-- नाम सेटअप मॉडल -->
+<div id="nameModal" class="modal-overlay" hidden>
+  <div class="modal-box">
+    <h2>स्वागत है!</h2>
+    <p>कॉलिंग एवं चैट शुरू करने के लिए अपना नाम लिखें</p>
+    <input id="nameInput" class="modal-input" placeholder="उदा. नीरज, अंश..." maxlength="15">
+    <button id="saveNameBtn" class="btn-gold">आगे बढ़ें</button>
+  </div>
+</div>
+
+<!-- प्रोफ़ाइल सेटिंग्स मॉडल -->
+<div id="profileModal" class="modal-overlay" hidden>
+  <div class="modal-box">
+    <h2>प्रोफ़ाइल सेटिंग्स</h2>
+    <p>अपना नाम बदलें या आईडी रीसेट करें</p>
+    <input id="editNameInput" class="modal-input" maxlength="15">
+    <button id="updateNameBtn" class="btn-gold">नाम सुरक्षित करें</button>
+    <button id="resetProfileBtn" class="btn-danger-outline">आईडी हटाएं / रीसेट करें</button>
+    <button id="closeProfileBtn" style="background:none;border:0;color:#8a7967;font-size:12px;margin-top:14px;font-weight:700">रद्द करें</button>
+  </div>
+</div>
+
+<!-- कॉल के दौरान सदस्य जोड़ने का मॉडल -->
+<div id="addParticipantModal" class="modal-overlay" hidden>
+  <div class="modal-box">
+    <h2>कॉल में सदस्य जोड़ें</h2>
+    <p>नीचे किसी भी ऑनलाइन संपर्क को कॉल में आमंत्रित करें</p>
+    <div id="addContactsList" style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;margin-bottom:12px"></div>
+    <button id="closeAddModalBtn" class="btn-danger-outline" style="color:#fbf7f0;border-color:var(--line)">रद्द करें</button>
+  </div>
+</div>
+
+<!-- ================= मुख्य स्क्रीन (LOBBY) ================= -->
+<div id="lobby" class="screen">
+  <div class="header">
+    <div class="logo">📹 वीडियो कॉल</div>
+    <div class="user-badge" id="myBadge">👤 लोड हो रहा है...</div>
+  </div>
+
+  <div class="perm-card">
+    <div class="perm-title"><span>🛡️</span> कैमरा एवं माइक अनुमति स्थिति</div>
+    <div class="perm-status-row">
+      <div class="perm-badge" id="camPermBadge"><span id="camDot" class="dot"></span> कैमरा: जांच जारी</div>
+      <div class="perm-badge" id="micPermBadge"><span id="micDot" class="dot"></span> माइक: जांच जारी</div>
+    </div>
+    <button class="btn-perm" id="checkPermBtn">अनुमति जांचें / चालू करें</button>
+    <div class="perm-help" id="permHelpBox" hidden>
+      ⚠️ <b>अनुमति बंद है:</b> ब्राउज़र में ऊपर ताला (🔒) आइकन दबाएँ -> साइट सेटिंग्स में कैमरा और माइक को <b>Allow</b> करें और पेज रीलोड करें।
+    </div>
+  </div>
+
+  <div class="contacts-wrap">
+    <div class="section-title">संपर्क एवं बातचीत</div>
+    <div id="contactsList">
+      <div style="text-align:center;padding:24px;color:#8a7967;font-size:13px">संपर्क लोड हो रहे हैं...</div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= चैट स्क्रीन ================= -->
+<div id="chatScreen" class="screen" hidden>
+  <div class="chat-header">
+    <div class="chat-header-user">
+      <button class="chat-back-btn" id="chatBackBtn">‹</button>
+      <div class="contact-avatar" id="chatAvatar">U</div>
+      <div>
+        <div class="chat-user-title" id="chatTargetName">उपयोगकर्ता</div>
+        <div class="chat-user-sub" id="chatTargetStatus">ऑफलाइन</div>
+      </div>
+    </div>
+    <button class="call-btn" id="chatCallBtn">📹 वीडियो कॉल</button>
+  </div>
+
+  <div class="chat-body" id="chatBody"></div>
+
+  <div class="chat-footer">
+    <input type="text" id="chatInput" class="chat-input" placeholder="संदेश लिखें..." maxlength="500">
+    <button id="chatSendBtn" class="send-btn">➤</button>
+  </div>
+</div>
+
+<!-- इनकमिंग कॉल डायलॉग -->
+<div id="incomingDialog" class="call-dialog" hidden>
+  <div style="text-align:center">
+    <div class="caller-photo">👤</div>
+    <div class="caller-title" id="incomingName">इनकमिंग वीडियो कॉल...</div>
+    <div class="caller-subtitle">बात करने के लिए कॉल उठाएँ</div>
+  </div>
+  <div class="dialog-actions">
+    <button class="circle-btn btn-reject" id="btnReject">
+      <span style="font-size:22px">✕</span><span>काटें</span>
+    </button>
+    <button class="circle-btn btn-accept" id="btnAccept">
+      <span style="font-size:22px">📞</span><span>उठाएँ</span>
+    </button>
+  </div>
+</div>
+
+<!-- आउटगोइंग कॉल डायलॉग -->
+<div id="outgoingDialog" class="call-dialog" hidden>
+  <div style="text-align:center">
+    <div class="caller-photo">📞</div>
+    <div class="caller-title" id="outgoingName">कॉलिंग...</div>
+    <div class="caller-subtitle">घंटी बज रही है...</div>
+  </div>
+  <button class="circle-btn btn-reject" id="btnCancelCall" style="width:70px;height:70px">
+    <span style="font-size:24px">✕</span><span>रद्द करें</span>
+  </button>
+</div>
+
+<!-- ================= वीडियो कॉल स्क्रीन ================= -->
+<div id="call" class="screen" hidden>
+  <!-- सामने वाले लोगों का वीडियो (1 में फुल, 2+ में स्प्लिट) -->
+  <div id="remoteGrid"></div>
+
+  <!-- अपनी वीडियो (हमेशा कोने में छोटी विंडो) -->
+  <div class="pip-wrap" id="pipWrap">
+    <video id="localVideo" autoplay playsinline muted></video>
+    <button class="pip-hide" id="pipHide">›</button>
+  </div>
+  <button class="pip-show" id="pipShow" hidden>👤</button>
+
+  <div class="top-pill" id="topPill">
+    <div class="timer-pill" id="callTimer">00:00</div>
+  </div>
+
+  <div class="controls" id="controlsBar">
+    <button class="ctl" id="micBtn" title="माइक"><span class="ctl-ic" id="micIco">🎙️</span></button>
+    <button class="ctl" id="camBtn" title="कैमरा"><span class="ctl-ic" id="camIco">📹</span></button>
+    <button class="ctl" id="speakerBtn" title="स्पीकर"><span class="ctl-ic" id="speakerIco">🔊</span></button>
+    <button class="ctl" id="flipBtn" title="कैमरा पलटें"><span class="ctl-ic">🔄</span></button>
+    <button class="ctl add" id="btnAddPerson" title="सदस्य जोड़ें"><span class="ctl-ic">➕</span></button>
+    <button class="ctl hang" id="hangBtn" title="कॉल समाप्त करें"><span class="ctl-ic">📞</span></button>
+  </div>
+</div>
+
+<div id="toast"></div>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import {
+  getDatabase, ref, set, get, update, remove,
+  onValue, onChildAdded, push, onDisconnect, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBg1VC0cd1FmGiXTkMvFFG-eSL46FmgtZU",
+  authDomain: "chess-e4910.firebaseapp.com",
+  databaseURL: "https://chess-e4910-default-rtdb.firebaseio.com",
+  projectId: "chess-e4910",
+  storageBucket: "chess-e4910.firebasestorage.app",
+  messagingSenderId: "62635884266",
+  appId: "1:62635884266:web:0375748951994b26cb2193",
+  measurementId: "G-WPMMGH247F"
+};
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+const ICE_SERVERS = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun.cloudflare.com:3478' }
+  ],
+  iceCandidatePoolSize: 10
+};
+
+const $ = id => document.getElementById(id);
+const lobbyScreen = $('lobby'), callScreen = $('call'), chatScreen =$('chatScreen');
+const contactsList = $('contactsList'), myBadge =$('myBadge');
+const incomingDialog = $('incomingDialog'), outgoingDialog =$('outgoingDialog');
+const callTimer = $('callTimer'), controlsBar = $('controlsBar'), topPill =$('topPill');
+const remoteGrid = $('remoteGrid'), localVideo =$('localVideo');
+const pipWrap = $('pipWrap'), pipShow =$('pipShow');
+
+let myUserId = localStorage.getItem('vc_user_id') || '';
+let myUserName = localStorage.getItem('vc_user_name') || '';
+let localStream = null;
+let activeCallId = null;
+let currentChatTargetId = null;
+let currentChatTargetName = null;
+let isCaller = false;
+let callStartTime = 0;
+let timerTimer = null;
+let facingMode = 'user';
+let micEnabled = true;
+let camEnabled = true;
+let speakerEnabled = true;
+let isCallConnected = false;
+let autoHideTimer = null;
+let isPipHidden = false;
+let allOnlineUsers = {};
+let unreadCounts = {}; // { [userId]: number }
+
+let peerConnections = {}; // { [peerId]: RTCPeerConnection }
+let unsubs = [];
+
+function toast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+function safeName(name) {
+  return String(name || '').replace(/[&<>"']/g, ch => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[ch]));
+}
+
+let audioCtx = null;
+function playTone(freq, duration, type='sine') {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + duration);
+  } catch(e) {}
+}
+
+let ringInterval = null;
+function startRingtone() {
+  if (ringInterval) return;
+  playTone(480, 0.4);
+  ringInterval = setInterval(() => {
+    playTone(480, 0.4);
+    setTimeout(() => playTone(440, 0.4), 450);
+  }, 2200);
+}
+function stopRingtone() {
+  if (ringInterval) { clearInterval(ringInterval); ringInterval = null; }
+}
+
+function triggerFullScreen() {
+  if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+    document.documentElement.requestFullscreen().catch(() => {});
+  }
+}
+
+// अनुमति जांच (लॉबी में कैमरा सीधे चालू नहीं होगा)
+async function checkMediaPermissions() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    stream.getTracks().forEach(t => t.stop());
+    $('camDot').className = 'dot online';
+    $('micDot').className = 'dot online';$('camPermBadge').innerHTML = '<span class="dot online"></span> कैमरा: स्वीकृत';
+    $('micPermBadge').innerHTML = '<span class="dot online"></span> माइक: स्वीकृत';
+    $('permHelpBox').hidden = true;
+    toast('कैमरा और माइक तैयार हैं!');
+    return true;
+  } catch(e) {
+    $('camDot').className = 'dot';
+    $('micDot').className = 'dot';$('camPermBadge').innerHTML = '<span class="dot"></span> कैमरा: बंद है';
+    $('micPermBadge').innerHTML = '<span class="dot"></span> माइक: बंद है';
+    $('permHelpBox').hidden = false;
+    return false;
+  }
+}
+$('checkPermBtn').onclick = () => checkMediaPermissions();
+
+async function acquireCallMedia() {
+  if (localStream) return localStream;
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: facingMode },
+        width: { ideal: 640, max: 1280 },
+        height: { ideal: 480, max: 720 },
+        frameRate: { ideal: 24, max: 30 }
+      },
+      audio: { echoCancellation: true, noiseSuppression: true }
+    });
+    localVideo.srcObject = localStream;
+    return localStream;
+  } catch(e) {
+    toast('कैमरा/माइक अनुमति आवश्यक है');
+    return null;
+  }
+}
+
+function checkUser() {
+  if (!myUserId || !myUserName) {
+    $('nameModal').hidden = false;
+  } else {
+    $('nameModal').hidden = true;
+    initPresence();
+  }
+}
+
+$('saveNameBtn').onclick = () => {
+  const val = $('nameInput').value.trim();
+  if (!val) return;
+  myUserName = val;
+  myUserId = val.toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Math.floor(100 + Math.random()*900);
+  localStorage.setItem('vc_user_id', myUserId);
+  localStorage.setItem('vc_user_name', myUserName);
+  $('nameModal').hidden = true;
+  initPresence();
+};
+
+myBadge.onclick = () => {
+  $('editNameInput').value = myUserName;
+  $('profileModal').hidden = false;
+};
+$('closeProfileBtn').onclick = () => {$('profileModal').hidden = true; };
+
+$('updateNameBtn').onclick = async () => {
+  const val = $('editNameInput').value.trim();
+  if (!val) return;
+  myUserName = val;
+  localStorage.setItem('vc_user_name', myUserName);
+  await update(ref(db, `users/${myUserId}`), { name: myUserName });
+  myBadge.textContent = '👤 ' + myUserName;
+  $('profileModal').hidden = true;
+};
+
+$('resetProfileBtn').onclick = async () => {
+  if (!confirm('क्या आप सच में अपनी आईडी हटाकर रीसेट करना चाहते हैं?')) return;
+  try {
+    await remove(ref(db, `users/${myUserId}`));
+    await remove(ref(db, `user_inbox/${myUserId}`));
+  } catch(e) {}
+  localStorage.clear();
+  location.href = location.pathname;
+};
+
+async function initPresence() {
+  myBadge.textContent = '👤 ' + myUserName;
+
+  const userRef = ref(db, `users/${myUserId}`);
+  await set(userRef, {
+    id: myUserId,
+    name: myUserName,
+    online: true,
+    lastSeen: serverTimestamp()
+  });
+
+  onDisconnect(userRef).remove();
+  onDisconnect(ref(db, `user_inbox/${myUserId}`)).remove();
+
+  onValue(ref(db, 'users'), (snap) => {
+    allOnlineUsers = snap.val() || {};
+    renderContacts(allOnlineUsers);
+  });
+
+  listenForIncoming();
+  listenForUnreadMessages();
+}
+
+function renderContacts(users) {
+  contactsList.innerHTML = '';
+  const userIds = Object.keys(users).filter(id => {
+    return id !== myUserId && users[id] && users[id].name && users[id].name.trim() !== '' && users[id].name !== 'User';
+  });
+
+  if (userIds.length === 0) {
+    contactsList.innerHTML = '<div style="text-align:center;padding:24px;color:#8a7967;font-size:13px">अन्य कोई संपर्क ऑनलाइन नहीं है।</div>';
+    return;
+  }
+
+  userIds.forEach(id => {
+    const u = users[id];
+    const isOnline = !!u.online;
+    const unread = unreadCounts[id] || 0;
+
+    const card = document.createElement('div');
+    card.className = 'contact-card';
+    card.innerHTML = `
+      <div class="contact-info">
+        <div class="contact-avatar">${safeName(u.name).charAt(0).toUpperCase()}</div>
+        <div>
+          <div class="contact-name-row">
+            <span class="contact-name">${safeName(u.name)}</span>
+            ${unread > 0 ? `<span class="badge-unread">${unread}</span>` : ''}
+          </div>
+          <div class="contact-status">
+            <span class="dot ${isOnline ? 'online' : ''}"></span>
+            ${isOnline ? 'ऑनलाइन' : 'ऑफलाइन'}
+          </div>
+        </div>
+      </div>
+      <div class="contact-actions">
+        <button class="icon-btn chat-trigger" title="चैट करें">💬</button>
+        <button class="call-btn call-trigger" ${!isOnline ? 'style="opacity:0.4;cursor:not-allowed"' : ''}>📞 कॉल</button>
+      </div>
+    `;
+
+    card.querySelector('.chat-trigger').onclick = (e) => {
+      e.stopPropagation();
+      openChat(id, u.name, isOnline);
+    };
+
+    const callBtn = card.querySelector('.call-trigger');
+    if (isOnline) {
+      callBtn.onclick = (e) => {
+        e.stopPropagation();
+        startCall(id, u.name);
+      };
+    }
+
+    card.onclick = () => openChat(id, u.name, isOnline);
+    contactsList.appendChild(card);
+  });
+}
+
+// चैट एवं लाल अनरीड बैज सिस्टम
+let chatUnsub = null;
+function getChatRoomId(userA, userB) {
+  return [userA, userB].sort().join('__');
+}
+
+function listenForUnreadMessages() {
+  onChildAdded(ref(db, 'chats'), (roomSnap) => {
+    const roomId = roomSnap.key;
+    if (!roomId.includes(myUserId)) return;
+
+    onChildAdded(ref(db, `chats/${roomId}/messages`), (msgSnap) => {
+      const msg = msgSnap.val();
+      if (!msg) return;
+      if (msg.senderId !== myUserId && (!currentChatTargetId || currentChatTargetId !== msg.senderId)) {
+        unreadCounts[msg.senderId] = (unreadCounts[msg.senderId] || 0) + 1;
+        renderContacts(allOnlineUsers);
+      }
+    });
+  });
+}
+
+function openChat(targetId, targetName, isOnline) {
+  currentChatTargetId = targetId;
+  currentChatTargetName = targetName;
+  unreadCounts[targetId] = 0;
+  renderContacts(allOnlineUsers);
+
+  $('chatTargetName').textContent = targetName;
+  $('chatTargetStatus').textContent = isOnline ? 'ऑनलाइन' : 'ऑफलाइन';
+  $('chatAvatar').textContent = targetName.charAt(0).toUpperCase();
+
+  lobbyScreen.hidden = true;
+  chatScreen.hidden = false;
+
+  loadChatMessages();
+}
+
+$('chatBackBtn').onclick = () => {
+  if (chatUnsub) { chatUnsub(); chatUnsub = null; }
+  currentChatTargetId = null;
+  chatScreen.hidden = true;
+  lobbyScreen.hidden = false;
+};
+
+$('chatCallBtn').onclick = () => {
+  if (currentChatTargetId) {
+    startCall(currentChatTargetId, currentChatTargetName);
+  }
+};
+
+function loadChatMessages() {
+  const chatBody = $('chatBody');
+  chatBody.innerHTML = '';
+  const roomId = getChatRoomId(myUserId, currentChatTargetId);
+
+  if (chatUnsub) chatUnsub();
+  chatUnsub = onValue(ref(db, `chats/${roomId}/messages`), (snap) => {
+    chatBody.innerHTML = '';
+    const msgs = snap.val() || {};
+    Object.values(msgs).forEach(m => {
+      const bubble = document.createElement('div');
+      bubble.className = `chat-bubble ${m.senderId === myUserId ? 'me' : 'them'}`;
+      const timeStr = m.time ? new Date(m.time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
+      bubble.innerHTML = `<div>${safeName(m.text)}</div><div class="chat-time">${timeStr}</div>`;
+      chatBody.appendChild(bubble);
+    });
+    chatBody.scrollTop = chatBody.scrollHeight;
+  });
+}
+
+async function sendChatMessage() {
+  const input = $('chatInput');
+  const text = input.value.trim();
+  if (!text || !currentChatTargetId) return;
+
+  const roomId = getChatRoomId(myUserId, currentChatTargetId);
+  const newMsgRef = push(ref(db, `chats/${roomId}/messages`));
+  await set(newMsgRef, {
+    senderId: myUserId,
+    senderName: myUserName,
+    text: text,
+    time: Date.now()
+  });
+  input.value = '';
+}
+$('chatSendBtn').onclick = sendChatMessage;
+$('chatInput').onkeypress = (e) => { if (e.key === 'Enter') sendChatMessage(); };
+// ================= कॉल फ्लो एवं सिग्नलिंग =================
+function listenForIncoming() {
+  const incomingRef = ref(db, `user_inbox/${myUserId}`);
+  onValue(incomingRef, async (snap) => {
+    const callData = snap.val();
+    if (callData && callData.status === 'ringing') {
+      activeCallId = callData.callId;
+      $('incomingName').textContent = (callData.callerName || 'कोई') + ' कॉल कर रहा है...';
+      incomingDialog.hidden = false;
+      startRingtone();
+    } else if (callData && (callData.status === 'cancelled' || callData.status === 'ended')) {
+      stopRingtone();
+      incomingDialog.hidden = true;
+      hangup(true);
+    }
+  });
+}
+
+async function startCall(remoteId, remoteName) {
+  const stream = await acquireCallMedia();
+  if (!stream) return;
+
+  activeCallId = `call_${Date.now()}_${Math.floor(Math.random()*1000)}`;
+  isCaller = true;
+
+  $('outgoingName').textContent = remoteName + ' को कॉल हो रहा है...';
+  outgoingDialog.hidden = false;
+  startRingtone();
+
+  await set(ref(db, `user_inbox/${remoteId}`), {
+    callId: activeCallId,
+    callerId: myUserId,
+    callerName: myUserName,
+    status: 'ringing'
+  });
+
+  const callRef = ref(db, `call_sessions/${activeCallId}/members/${remoteId}`);
+  const unsubAns = onValue(callRef, (snap) => {
+    if (snap.exists()) {
+      stopRingtone();
+      outgoingDialog.hidden = true;
+      unsubAns();
+      joinCallSession();
+    }
+  });
+  unsubs.push(unsubAns);
+}
+
+$('btnCancelCall').onclick = async () => {
+  stopRingtone();
+  outgoingDialog.hidden = true;
+  hangup();
+};
+
+$('btnAccept').onclick = async () => {
+  stopRingtone();
+  incomingDialog.hidden = true;
+  const stream = await acquireCallMedia();
+  if (!stream) return;
+
+  joinCallSession();
+};
+
+$('btnReject').onclick = async () => {
+  stopRingtone();
+  incomingDialog.hidden = true;
+  await remove(ref(db, `user_inbox/${myUserId}`));
+};
+
+// ================= कॉल सेशन (2 लोग = फुल स्क्रीन, 3+ = स्प्लिट) =================
+async function joinCallSession() {
+  triggerFullScreen();
+  lobbyScreen.hidden = true;
+  chatScreen.hidden = true;
+  callScreen.hidden = false;
+  isCallConnected = true;
+  isPipHidden = false;
+
+  // अपनी वीडियो हमेशा कोने में छोटी विंडो (PiP) में रहेगी
+  localVideo.srcObject = localStream;
+  localVideo.play().catch(()=>{});
+  pipWrap.classList.remove('hidden');
+  pipShow.hidden = true;
+
+  startTimer();
+  scheduleAutoHide();
+
+  const myMemberRef = ref(db, `call_sessions/${activeCallId}/members/${myUserId}`);
+  await set(myMemberRef, {
+    name: myUserName,
+    joinedAt: Date.now()
+  });
+  onDisconnect(myMemberRef).remove();
+
+  const membersRef = ref(db, `call_sessions/${activeCallId}/members`);
+  onValue(membersRef, (snap) => {
+    const members = snap.val() || {};
+    const memberIds = Object.keys(members);
+
+    memberIds.forEach(peerId => {
+      if (peerId !== myUserId && !peerConnections[peerId]) {
+        initiatePeerConnection(peerId, members[peerId].name);
+      }
+    });
+
+    Object.keys(peerConnections).forEach(peerId => {
+      if (!members[peerId]) {
+        closePeer(peerId);
+      }
+    });
+
+    updateRemoteGridClass();
+  });
+}
+
+function initiatePeerConnection(peerId, peerName) {
+  const pc = new RTCPeerConnection(ICE_SERVERS);
+  peerConnections[peerId] = pc;
+
+  localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+
+  pc.ontrack = (event) => {
+    const remoteStream = event.streams[0];
+    addRemoteVideoCell(peerId, peerName, remoteStream);
+    updateRemoteGridClass();
+  };
+
+  const mySignalPath = `call_sessions/${activeCallId}/signals/${myUserId}__${peerId}`;
+  const peerSignalPath = `call_sessions/${activeCallId}/signals/${peerId}__${myUserId}`;
+
+  pc.onicecandidate = (event) => {
+    if (event.candidate) {
+      push(ref(db, `${mySignalPath}/candidates`), event.candidate.toJSON());
+    }
+  };
+
+  onChildAdded(ref(db, `${peerSignalPath}/candidates`), (snap) => {
+    const cand = snap.val();
+    if (cand) pc.addIceCandidate(new RTCIceCandidate(cand)).catch(()=>{});
+  });
+
+  if (myUserId < peerId) {
+    pc.createOffer().then(offer => pc.setLocalDescription(offer)).then(() => {
+      set(ref(db, `${mySignalPath}/offer`), {
+        sdp: pc.localDescription.sdp,
+        type: pc.localDescription.type
+      });
+    });
+
+    onValue(ref(db, `${peerSignalPath}/answer`), (snap) => {
+      const ans = snap.val();
+      if (ans && !pc.currentRemoteDescription) {
+        pc.setRemoteDescription(new RTCSessionDescription(ans)).catch(()=>{});
+      }
+    });
+  } else {
+    onValue(ref(db, `${peerSignalPath}/offer`), async (snap) => {
+      const offer = snap.val();
+      if (offer && !pc.currentRemoteDescription) {
+        await pc.setRemoteDescription(new RTCSessionDescription(offer));
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        set(ref(db, `${mySignalPath}/answer`), {
+          sdp: answer.sdp,
+          type: answer.type
+        });
+      }
+    });
+  }
+}
+
+// रिमोट वीडियो सेल जोड़ना
+function addRemoteVideoCell(id, name, stream) {
+  let cell = document.getElementById(`remote_cell_${id}`);
+  if (!cell) {
+    cell = document.createElement('div');
+    cell.id = `remote_cell_${id}`;
+    cell.className = 'remote-cell';
+    cell.innerHTML = `
+      <video autoplay playsinline></video>
+      <div class="cell-badge">${safeName(name)}</div>
+    `;
+    remoteGrid.appendChild(cell);
+  }
+  const video = cell.querySelector('video');
+  video.srcObject = stream;
+  video.muted = !speakerEnabled;
+  video.play().catch(()=>{});
+}
+
+function removeRemoteVideoCell(id) {
+  const cell = document.getElementById(`remote_cell_${id}`);
+  if (cell) cell.remove();
+}
+
+function updateRemoteGridClass() {
+  const remoteCount = remoteGrid.children.length;
+  remoteGrid.className = '';
+  if (remoteCount <= 1) {
+    // 2 लोग: सामने वाले का वीडियो 100% फुल स्क्रीन
+    remoteGrid.classList.add('count-1');
+  } else if (remoteCount === 2) {
+    // 3 लोग: स्क्रीन 2 हिस्सों में स्प्लिट (आपकी वीडियो PiP में ही रहेगी)
+    remoteGrid.classList.add('count-2');
+  } else {
+    // 4 या ज्यादा लोग: 4 हिस्सों में स्प्लिट
+    remoteGrid.classList.add('count-4');
+  }
+}
+
+function closePeer(peerId) {
+  if (peerConnections[peerId]) {
+    peerConnections[peerId].close();
+    delete peerConnections[peerId];
+  }
+  removeRemoteVideoCell(peerId);
+  updateRemoteGridClass();
+}
+
+// ================= तीसरे सदस्य को जोड़ने का बटन =================
+$('btnAddPerson').onclick = () => {
+  const addList = $('addContactsList');
+  addList.innerHTML = '';
+
+  const onlineIds = Object.keys(allOnlineUsers).filter(id => {
+    return id !== myUserId && !peerConnections[id] && allOnlineUsers[id].online;
+  });
+
+  if (onlineIds.length === 0) {
+    addList.innerHTML = '<div style="font-size:12px;color:#8a7967;padding:12px">अन्य कोई ऑनलाइन संपर्क नहीं है</div>';
+  } else {
+    onlineIds.forEach(id => {
+      const u = allOnlineUsers[id];
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,.05);padding:8px 12px;border-radius:12px;';
+      row.innerHTML = `
+        <span style="font-size:13px;font-weight:700">${safeName(u.name)}</span>
+        <button style="background:var(--accent);border:0;color:#000;font-size:11px;font-weight:800;padding:6px 12px;border-radius:16px;">जोड़ें</button>
+      `;
+      row.querySelector('button').onclick = async () => {
+        await set(ref(db, `user_inbox/${id}`), {
+          callId: activeCallId,
+          callerId: myUserId,
+          callerName: myUserName + ' (ग्रुप)',
+          status: 'ringing'
+        });
+        toast(`${u.name} को कॉल भेजा गया!`);
+        $('addParticipantModal').hidden = true;
+      };
+      addList.appendChild(row);
+    });
+  }
+
+  $('addParticipantModal').hidden = false;
+};
+$('closeAddModalBtn').onclick = () => {$('addParticipantModal').hidden = true; };
+
+// ================= कंट्रोल्स एवं ऑटो-हाइड =================
+function scheduleAutoHide() {
+  clearTimeout(autoHideTimer);
+  autoHideTimer = setTimeout(() => {
+    if (isCallConnected) {
+      controlsBar.classList.add('fade-out');
+      topPill.classList.add('fade-out');
+      if (isPipHidden) pipShow.classList.add('fade-out-right');
+    }
+  }, 2600);
+}
+
+callScreen.addEventListener('click', (e) => {
+  if (e.target.closest('.ctl') || e.target.closest('.pip-wrap') || e.target.closest('.pip-show') || e.target.closest('.modal-box')) return;
+  triggerFullScreen();
+  const isHidden = controlsBar.classList.contains('fade-out');
+  if (isHidden) {
+    controlsBar.classList.remove('fade-out');
+    topPill.classList.remove('fade-out');
+    if (isPipHidden) pipShow.classList.remove('fade-out-right');
+    scheduleAutoHide();
+  } else {
+    controlsBar.classList.add('fade-out');
+    topPill.classList.add('fade-out');
+    if (isPipHidden) pipShow.classList.add('fade-out-right');
+  }
+});
+
+// 🎙️ माइक टॉगल
+$('micBtn').onclick = () => {
+  micEnabled = !micEnabled;
+  if (localStream) localStream.getAudioTracks().forEach(t => t.enabled = micEnabled);
+  $('micBtn').classList.toggle('off', !micEnabled);$('micIco').textContent = micEnabled ? '🎙️' : '🚫';
+  scheduleAutoHide();
+};
+
+$('camBtn').onclick = () => {
+  camEnabled = !camEnabled;
+  if (localStream) localStream.getVideoTracks().forEach(t => t.enabled = camEnabled);
+  $('camBtn').classList.toggle('off', !camEnabled);$('camIco').textContent = camEnabled ? '📹' : '🚫';
+  pipWrap.style.opacity = camEnabled ? '1' : '0.2';
+  scheduleAutoHide();
+};
+
+$('speakerBtn').onclick = () => {
+  speakerEnabled = !speakerEnabled;
+  remoteGrid.querySelectorAll('video').forEach(v => { v.muted = !speakerEnabled; });
+  $('speakerBtn').classList.toggle('off', !speakerEnabled);$('speakerIco').textContent = speakerEnabled ? '🔊' : '🔇';
+  scheduleAutoHide();
+};
+
+$('flipBtn').onclick = async () => {
+  facingMode = facingMode === 'user' ? 'environment' : 'user';
+  try {
+    if (localStream) localStream.getVideoTracks().forEach(t => t.stop());
+    const newStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: facingMode } }, audio: false
+    });
+    const newTrack = newStream.getVideoTracks()[0];
+    const oldTrack = localStream.getVideoTracks()[0];
+    localStream.removeTrack(oldTrack);
+    localStream.addTrack(newTrack);
+    localVideo.srcObject = localStream;
+
+    Object.values(peerConnections).forEach(pc => {
+      const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+      if (sender) sender.replaceTrack(newTrack);
+    });
+  } catch(e) {}
+  scheduleAutoHide();
+};
+
+$('hangBtn').onclick = () => hangup();
+
+function hangup(silent = false) {
+  stopRingtone();
+  stopTimer();
+  clearTimeout(autoHideTimer);
+  playTone(260, 0.25, 'triangle');
+
+  if (activeCallId) {
+    remove(ref(db, `call_sessions/${activeCallId}/members/${myUserId}`)).catch(()=>{});
+  }
+  remove(ref(db, `user_inbox/${myUserId}`)).catch(()=>{});
+
+  Object.keys(peerConnections).forEach(id => closePeer(id));
+  peerConnections = {};
+
+  if (localStream) {
+    localStream.getTracks().forEach(t => t.stop());
+    localStream = null;
+  }
+
+  remoteGrid.innerHTML = '';
+  activeCallId = null;
+  isCallConnected = false;
+  isPipHidden = false;
+
+  controlsBar.classList.remove('fade-out');
+  topPill.classList.remove('fade-out');
+  pipShow.classList.remove('fade-out-right');
+  pipShow.hidden = true;
+  pipWrap.classList.remove('hidden');
+
+  callScreen.hidden = true;
+  incomingDialog.hidden = true;
+  outgoingDialog.hidden = true;
+  lobbyScreen.hidden = false;
+
+  if (document.fullscreenElement && document.exitFullscreen) {
+    document.exitFullscreen().catch(()=>{});
+  }
+}
+
+function startTimer() {
+  callStartTime = Date.now();
+  if (timerTimer) clearInterval(timerTimer);
+  timerTimer = setInterval(() => {
+    const diff = Math.floor((Date.now() - callStartTime) / 1000);
+    const m = String(Math.floor(diff / 60)).padStart(2, '0');
+    const s = String(diff % 60).padStart(2, '0');
+    callTimer.textContent = `${m}:${s}`;
+  }, 1000);
+}
+function stopTimer() {
+  if (timerTimer) { clearInterval(timerTimer); timerTimer = null; }
+  callTimer.textContent = '00:00';
+}
+
+// अपनी वीडियो को साइड में छिपाने का टॉगल
+$('pipHide').onclick = (e) => {
+  e.stopPropagation();
+  pipWrap.classList.add('hidden');
+  pipShow.hidden = false;
+  isPipHidden = true;
+  scheduleAutoHide();
+};
+$('pipShow').onclick = (e) => {
+  e.stopPropagation();
+  pipWrap.classList.remove('hidden');
+  pipShow.hidden = true;
+  isPipHidden = false;
+  scheduleAutoHide();
+};
+
+checkUser();
+</script>
+</body>
+</html>
+
